@@ -1,64 +1,90 @@
 const puppeteer = require('puppeteer');
+const fs = require('fs-extra');
 const category = 'electronics';
+const width = 1024;
+const height = 10000;
 (async () => {
   try {
-    const browser = await puppeteer.launch({ headless: false });
+    const browser = await puppeteer.launch({
+      headless: true,
+      defaultViewport: { width: width, height: height },
+    });
     const page = await browser.newPage();
-    // set user agent (override the default headless User Agent)
+    await page.setViewport({ width: width, height: height });
     await page.setUserAgent(
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36'
     );
     await page.setDefaultNavigationTimeout(0);
-    // await page.goto(`https://www.pigiame.co.ke/${category}`, {
-    //   waitUntil: 'networkidle2',
-    // });
-    // await page.waitForSelector('.listings-cards__list-item');
-    // const listings = await page.$$('.listings-cards__list-item');
-    for (let i = 0; i < 10; i++) {
-      await page.goto(`https://www.pigiame.co.ke/${category}`);
-      await page.waitForSelector('.listings-cards__list-item');
-      const listings = await page.$$('.listings-cards__list-item');
-
+    //Initial Code here
+    await page.goto(`https://www.emploi.co/vacancies`, {
+      waitUntil: 'networkidle2',
+    });
+    let docName = 'emploiJobs' + Date.now() + '.csv';
+    fs.writeFile(
+      docName,
+      'Title, Positions,Location,Type,Posted, DateOfScrapping\n'
+    );
+    for (let i = 0; i < 15; i++) {
+      await page.goto(`https://www.emploi.co/vacancies`);
+      await page.waitForSelector('.col-12.col-lg-8 > div > div.col-8 > h4 > a');
+      const listings = await page.$$(
+        '.col-12.col-lg-8 > div > div.col-8 > h4 > a'
+      );
       const item = listings[i];
-      // const itemName = await page.evaluate((item) => item.innerText, item);
-      // console.log(itemName);
-      await item.click(item);
-      await page.waitForSelector('.listing-item__description');
-      const itemContainer = await page.$('.listing-page__content');
-      const itemName = await itemContainer.$eval(
-        '.listing-card__header__title',
-        (element) => element.innerText
-      );
-      const itemRegion = await itemContainer.$eval(
-        '.listing-item__address-region',
-        (element) => element.innerText
-      ).innerText;
-      const itemLocation = await itemContainer.$eval(
-        '.listing-item__address-location',
-        (element) => element.innerText
-      ).innerText;
-      const itemPrice = await itemContainer.$eval(
-        '.listing-card__price__value',
-        (element) => element.innerText
-      );
-      const datePosted = await itemContainer.$eval(
-        '.listing-item__details__date',
-        (element) => element.innerText
-      );
-      const itemDescription = await itemContainer.$eval(
-        '.listing-item__description > :nth-child(3)',
-        (element) => element.innerText
-      );
-      console.log(`Name:${itemName}, Price: ${itemPrice}`);
-    }
+      const itemName = await page.evaluate((item) => item.innerText, item);
 
-    // await page.screenshot({ path: 'docs/puppeteerDocs.png' });
-    // await console.log('Taken screenshot');
-    // await page.pdf({ path: 'docs/puppeteerDocs.pdf', format: 'A4' });
-    // await console.log('saved pdf');
-    // await console.log('closing browser');
+      await item.click();
+      await page.waitForSelector(' h2');
+
+      const jobTitle = await page.$('h2');
+      const title = await page.evaluate(
+        (jobTitle) => jobTitle.innerText,
+        jobTitle
+      );
+      const pos = await page.$('.badge-secondary');
+      const positions = await page.evaluate((pos) => pos.innerText, pos);
+      const loc = await page.$(
+        '#job-description > div > div > div.row.pb-3 > div.col-12.col-md-6.col-lg-7 > p'
+      );
+      const location = await page.evaluate((loc) => loc.innerText, loc);
+      const cat = await page.$(
+        '.justify-content-between.text-sm-left.text-md-right > p > a'
+      );
+      const category = await page.evaluate((cat) => cat.innerText, cat);
+      const taip = await page.$(
+        '.justify-content-between.text-sm-left.text-md-right > p > a> span'
+      );
+      const jobType = await page.evaluate((taip) => taip.innerText, taip);
+      const pstd = await page.$(
+        '.justify-content-between.text-sm-left.text-md-right > p > span'
+      );
+      const timePosted = await page.evaluate((pstd) => pstd.innerText, pstd);
+      const desc = await page.$('#job-description > div > div > div');
+      const jobDescription = await page.evaluate(
+        (desc) => desc.innerHTML,
+        desc
+      );
+
+      // const data = {
+      //   title,
+      //   positions,
+      //   location,
+      //   category,
+      //   jobType,
+      //   timePosted,
+      //   jobDescription,
+      // };
+
+      await fs.appendFile(
+        docName,
+        `"${title}","${positions}","${location}","${jobType}","${timePosted}",${new Date().toISOString()}\n`
+      );
+
+      console.log('Done! Data saved.');
+    }
     await browser.close();
   } catch (error) {
     console.log(`our error: ${error}`);
   }
 })();
+
